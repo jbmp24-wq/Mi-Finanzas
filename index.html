@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mi Finanzas</title>
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- PWA manifest and theme color -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#2563eb" />
+</head>
+<body>
+  <header>
+    <h1>Mi Finanzas</h1>
+    <!-- Reordered buttons: first category then expense, then incomes -->
+    <button id="openAddCategory" class="secondary-btn" onclick="openCategoryModal()">Añadir categoría</button>
+    <button id="openAddExpense" class="primary-btn" onclick="openExpenseModal()">Añadir gasto</button>
+    <button id="openConfig" class="secondary-btn" onclick="openConfigModal()">Ingresos</button>
+  </header>
+  <main>
+    <section id="summary" class="card">
+      <h2>Resumen mensual</h2>
+      <div class="summary-grid">
+        <div class="summary-item">
+          <span>Ingresos</span>
+          <span id="salaryAmount">0 €</span>
+        </div>
+        <div class="summary-item">
+          <span>Ahorrado</span>
+          <span id="savingsAmount">0 €</span>
+        </div>
+        <div class="summary-item">
+          <span>Gastado</span>
+          <span id="spentAmount">0 €</span>
+        </div>
+        <div class="summary-item">
+          <span>Disponible</span>
+          <span id="availableAmount">0 €</span>
+        </div>
+      </div>
+    </section>
+    <section id="categories" class="card">
+      <h2>Categorías</h2>
+      <div id="categoriesList"></div>
+    </section>
+    <section id="transactions" class="card">
+      <h2>Movimientos</h2>
+      <ul id="transactionsList"></ul>
+    </section>
+
+    <!-- Charts section (hidden by default) -->
+    <section id="chartsSection" class="card hidden">
+      <h2>Gráficas</h2>
+      <div class="chart-container">
+        <canvas id="pieChart" width="300" height="200"></canvas>
+        <div id="pieLegend"></div>
+        <canvas id="barChart" width="300" height="200"></canvas>
+      </div>
+    </section>
+
+    <!-- Goals/savings section (hidden by default) -->
+    <section id="goalsSection" class="card hidden">
+      <h2>Ahorro</h2>
+      <!-- Card showing total savings -->
+      <div id="totalSavingsCard" class="goal-total-card"></div>
+      <!-- List of monthly savings will be populated here -->
+      <div id="monthlySavingsList" class="savings-list"></div>
+      <button id="editGoal" class="secondary-btn">Editar objetivo</button>
+    </section>
+  </main>
+
+  <!-- Bottom navigation for mobile experience -->
+  <nav id="bottomNav" class="bottom-nav">
+    <button class="nav-btn active" data-page="home">
+      <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+        <path d="M3 9.5L12 3l9 6.5v11a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1V14h-6v6.5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-11z" fill="none" stroke="currentColor" stroke-width="2"/>
+      </svg>
+      <span>Inicio</span>
+    </button>
+    <button class="nav-btn" data-page="calendar">
+      <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="16" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"/>
+        <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" stroke-width="2"/>
+        <line x1="7" y1="4" x2="7" y2="2" stroke="currentColor" stroke-width="2"/>
+        <line x1="17" y1="4" x2="17" y2="2" stroke="currentColor" stroke-width="2"/>
+      </svg>
+      <span>Calendario</span>
+    </button>
+    <button class="nav-btn" data-page="charts">
+      <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+        <rect x="3" y="12" width="3" height="9" fill="none" stroke="currentColor" stroke-width="2"/>
+        <rect x="10" y="6" width="3" height="15" fill="none" stroke="currentColor" stroke-width="2"/>
+        <rect x="17" y="9" width="3" height="12" fill="none" stroke="currentColor" stroke-width="2"/>
+      </svg>
+      <span>Gráficas</span>
+    </button>
+    <button class="nav-btn" data-page="goals">
+      <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+        <path d="M5 3v18M5 4h12l-3 4 3 4H5" fill="none" stroke="currentColor" stroke-width="2"/>
+      </svg>
+      <span>Ahorro</span>
+    </button>
+  </nav>
+
+
+  <!-- Modal for adding expense -->
+  <div id="expenseModal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Añadir gasto</h3>
+      <label>
+        Concepto
+        <input type="text" id="expenseConcept" />
+      </label>
+      <label>
+        Cantidad (€)
+        <input type="number" id="expenseAmount" min="0" step="0.01" />
+        <!-- Quick amount buttons to speed input -->
+        <div class="quick-amounts">
+          <button type="button" class="quick-amount" data-value="1">1</button>
+          <button type="button" class="quick-amount" data-value="5">5</button>
+          <button type="button" class="quick-amount" data-value="10">10</button>
+          <button type="button" class="quick-amount" data-value="20">20</button>
+          <button type="button" class="quick-amount" data-value="50">50</button>
+        </div>
+      </label>
+      <label>
+        Categoría
+        <!-- List of categories to select instead of dropdown -->
+        <div id="expenseCategoryList" class="category-select-list"></div>
+      </label>
+      <div class="modal-actions">
+        <button id="saveExpense" class="primary-btn">Guardar</button>
+        <button id="cancelExpense" class="secondary-btn">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for adding/editing category -->
+  <div id="categoryModal" class="modal hidden">
+    <div class="modal-content">
+      <h3 id="categoryModalTitle">Añadir categoría</h3>
+      <label>
+        Nombre
+        <input type="text" id="categoryName" />
+      </label>
+      <label>
+        Límite (€)
+        <input type="number" id="categoryLimit" min="0" step="0.01" />
+      </label>
+      <label>
+        Color de la categoría
+        <!-- Hidden input to store selected color -->
+        <input type="hidden" id="categoryColor" value="#22c55e" />
+        <!-- Color palette will be populated via JS -->
+        <div id="colorPalette" class="color-palette"></div>
+      </label>
+      <div class="modal-actions">
+        <button id="saveCategory" class="primary-btn">Guardar</button>
+        <button id="cancelCategory" class="secondary-btn">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+    <!-- Modal for editing configuration (salary and savings) -->
+    <div id="configModal" class="modal hidden">
+      <div class="modal-content">
+        <h3>Editar valores</h3>
+        <label>
+          Ingresos mensuales (€)
+          <input type="number" id="configSalary" min="0" step="0.01" />
+        </label>
+        <label>
+          Ahorro mensual (€)
+          <input type="number" id="configSavings" min="0" step="0.01" />
+        </label>
+        <div class="modal-actions">
+          <button id="saveConfig" class="primary-btn">Guardar</button>
+          <button id="cancelConfig" class="secondary-btn">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal for calendar view -->
+    <div id="calendarModal" class="modal hidden">
+      <div class="modal-content calendar-modal">
+        <div class="calendar-header">
+          <button id="prevMonth" class="secondary-btn" aria-label="Mes anterior">&lt;</button>
+          <h3 id="calendarMonthYear">Mes Año</h3>
+          <button id="nextMonth" class="secondary-btn" aria-label="Mes siguiente">&gt;</button>
+        </div>
+        <div class="calendar-grid">
+          <div class="calendar-weekdays">
+            <div>Lun</div>
+            <div>Mar</div>
+            <div>Mié</div>
+            <div>Jue</div>
+            <div>Vie</div>
+            <div>Sáb</div>
+            <div>Dom</div>
+          </div>
+          <div id="calendarDays" class="calendar-days"></div>
+        </div>
+        <div id="calendarDetails" class="calendar-details"></div>
+        <div class="modal-actions">
+          <button id="closeCalendar" class="secondary-btn">Cerrar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal for editing savings goal -->
+    <div id="goalModal" class="modal hidden">
+      <div class="modal-content">
+        <h3>Editar objetivo de ahorro</h3>
+        <label>
+          Nombre del objetivo
+          <input type="text" id="goalNameInput" />
+        </label>
+        <label>
+          Objetivo (€)
+          <input type="number" id="goalInput" min="0" step="0.01" />
+        </label>
+        <div class="modal-actions">
+          <button id="saveGoal" class="primary-btn">Guardar</button>
+          <button id="cancelGoal" class="secondary-btn">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+  <!-- Embedding the script directly to avoid file:// loading issues -->
+  <script>
+    // Script to manage the finance app state and UI
+
+    // Load initial state from localStorage or create default structure
+    function loadState() {
+      try {
+        const data = localStorage.getItem('miFinanzasData');
+        if (data) {
+          try {
+            return JSON.parse(data);
+          } catch (e) {
+            console.error('Error parsing data', e);
+          }
+        }
+      } catch (err) {
+        console.warn('localStorage not accessible', err);
+      }
+      // Default state
+      return {
+        config: {
+          salary: 0,
+          savings: 0,
+        },
+        categories: [],
+        transactions: [],
+      };
+    }
+
+    function saveState(state) {
+      try {
+        localStorage.setItem('miFinanzasData', JSON.stringify(state));
+      } catch (err) {
+        console.warn('localStorage not accessible', err);
+      }
+    }
+
+    // Generate a simple unique ID for items
+    function generateId() {
+      return 'id-' + Math.random().toString(36).substr(2, 9);
+    }
+
+
+    // Global state variable
+    let state = loadState();
+
+    // Ensure default categories exist. If categories array is empty or missing any default
+    {
+      const defaults = [
+        { name: 'Comida', limit: 0, color: '#22c55e', icon: '🍽️' },
+        { name: 'Cena con amigos', limit: 0, color: '#3b82f6', icon: '🍷' },
+        { name: 'Ocio', limit: 0, color: '#facc15', icon: '🎉' },
+        { name: 'Coche', limit: 0, color: '#ec4899', icon: '🚗' },
+        { name: 'Gasolina', limit: 0, color: '#8b5cf6', icon: '⛽' },
+        { name: 'Lucía', limit: 0, color: '#ffffff', icon: '🤍' }
+      ];
+      if (!state.categories) state.categories = [];
+      defaults.forEach(def => {
+        const exists = state.categories.some(cat => cat.name === def.name);
+        if (!exists) {
+          state.categories.push({ id: generateId(), name: def.name, limit: def.limit, color: def.color, icon: def.icon });
+        }
+      });
+      // Persist added defaults
+      saveState(state);
+    }
+
+    // Editing category id variable declared early to avoid temporal dead zone
+    var editingCategoryId = null;
+
+    // Track which transaction is being edited.  When null, a new transaction will be added.
+    var editingTransactionId = null;
+
+    // Debug indicator has served its purpose; no longer needed. Uncomment below for troubleshooting.
+    /*
+    (function() {
+      const dbg = document.createElement('div');
+      dbg.id = 'debug-indicator';
+      dbg.textContent = 'script loaded';
+      dbg.style.position = 'fixed';
+      dbg.style.bottom = '10px';
+      dbg.style.right = '10px';
+      dbg.style.backgroundColor = '#22c55e';
+      dbg.style.color = '#000';
+      dbg.style.padding = '5px 8px';
+      dbg.style.borderRadius = '4px';
+      dbg.style.zIndex = '2000';
+      document.body.appendChild(dbg);
+    })();
+    */
+
+    // Elements
+    const salaryAmountEl = document.getElementById('salaryAmount');
+    const savingsAmountEl = document.getElementById('savingsAmount');
+    const spentAmountEl = document.getElementById('spentAmount');
+    const availableAmountEl = document.getElementById('availableAmount');
+    const categoriesListEl = document.getElementById('categoriesList');
+    const transactionsListEl = document.getElementById('transactionsList');
+
+    // Modal elements
+    const expenseModal = document.getElementById('expenseModal');
+    const categoryModal = document.getElementById('categoryModal');
+    const configModal = document.getElementById('configModal');
+
+    // Buttons
+    {
+      const btnExpense = document.getElementById('openAddExpense');
+      if (btnExpense) btnExpense.addEventListener('click', openExpenseModal);
+      const btnCategory = document.getElementById('openAddCategory');
+      if (btnCategory) btnCategory.addEventListener('click', () => openCategoryModal());
+      const btnConfig = document.getElementById('openConfig');
+      if (btnConfig) btnConfig.addEventListener('click', openConfigModal);
+    }
+
+    // Initialize goal amount in configuration if undefined
+    if (state.config.goalAmount === undefined) {
+      state.config.goalAmount = 0;
+    }
+
+    // Sections and navigation references
+    const summarySection = document.getElementById('summary');
+    const categoriesSection = document.getElementById('categories');
+    const transactionsSection = document.getElementById('transactions');
+    const chartsSection = document.getElementById('chartsSection');
+    const goalsSection = document.getElementById('goalsSection');
+    // Elements for savings display
+    const monthlySavingsListEl = document.getElementById('monthlySavingsList');
+    const totalSavingsCardEl = document.getElementById('totalSavingsCard');
+    const navButtons = document.querySelectorAll('#bottomNav .nav-btn');
+    const goalModal = document.getElementById('goalModal');
+
+    // Define a set of preset colors for category selection.  Include white as a neutral option
+    const presetColors = ['#22c55e', '#3b82f6', '#facc15', '#ec4899', '#8b5cf6', '#f97316', '#10b981', '#e11d48', '#ffffff'];
+
+    // Navigation switching function
+    function switchPage(page) {
+      navButtons.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.page === page);
+      });
+      if (page === 'home') {
+        summarySection.style.display = '';
+        categoriesSection.style.display = '';
+        transactionsSection.style.display = '';
+        chartsSection.style.display = 'none';
+        goalsSection.style.display = 'none';
+        render();
+      } else if (page === 'calendar') {
+        // Show home sections so the calendar modal overlays correctly
+        summarySection.style.display = '';
+        categoriesSection.style.display = '';
+        transactionsSection.style.display = '';
+        chartsSection.style.display = 'none';
+        goalsSection.style.display = 'none';
+        openCalendarModal();
+      } else if (page === 'charts') {
+        summarySection.style.display = 'none';
+        categoriesSection.style.display = 'none';
+        transactionsSection.style.display = 'none';
+        chartsSection.style.display = '';
+        goalsSection.style.display = 'none';
+        renderCharts();
+      } else if (page === 'goals') {
+        summarySection.style.display = 'none';
+        categoriesSection.style.display = 'none';
+        transactionsSection.style.display = 'none';
+        chartsSection.style.display = 'none';
+        goalsSection.style.display = '';
+        renderGoal();
+      }
+    }
+
+    // Attach event listeners to navigation buttons
+    navButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const page = btn.dataset.page;
+        switchPage(page);
+      });
+    });
+
+    // Goal modal functions
+    function openGoalModal() {
+      const nameInput = document.getElementById('goalNameInput');
+      const amountInput = document.getElementById('goalInput');
+      if (nameInput) nameInput.value = state.config.goalName || '';
+      if (amountInput) amountInput.value = state.config.goalAmount || '';
+      openModal(goalModal);
+    }
+
+    function saveGoal() {
+      const nameInput = document.getElementById('goalNameInput');
+      const amountInput = document.getElementById('goalInput');
+      const nameVal = nameInput ? nameInput.value.trim() : '';
+      const val = amountInput ? parseFloat(amountInput.value) : NaN;
+      if (!nameVal || isNaN(val)) {
+        alert('Por favor, ingresa un nombre y una cantidad válidos');
+        return;
+      }
+      state.config.goalName = nameVal;
+      state.config.goalAmount = val;
+      saveState(state);
+      closeModal(goalModal);
+      renderGoal();
+    }
+
+    // Attach goal modal buttons
+    const editGoalBtn = document.getElementById('editGoal');
+    if (editGoalBtn) editGoalBtn.addEventListener('click', openGoalModal);
+    const cancelGoalBtn = document.getElementById('cancelGoal');
+    if (cancelGoalBtn) cancelGoalBtn.addEventListener('click', () => closeModal(goalModal));
+    const saveGoalBtn = document.getElementById('saveGoal');
+    if (saveGoalBtn) saveGoalBtn.addEventListener('click', saveGoal);
+
+    document.getElementById('cancelExpense').addEventListener('click', () => closeModal(expenseModal));
+    document.getElementById('cancelCategory').addEventListener('click', () => closeModal(categoryModal));
+    document.getElementById('cancelConfig').addEventListener('click', () => closeModal(configModal));
+
+    document.getElementById('saveExpense').addEventListener('click', saveExpense);
+    document.getElementById('saveCategory').addEventListener('click', saveCategory);
+    document.getElementById('saveConfig').addEventListener('click', saveConfig);
+
+    // Input elements
+    const expenseConceptEl = document.getElementById('expenseConcept');
+    const expenseAmountEl = document.getElementById('expenseAmount');
+    // Instead of a select element, we use a custom list of category items
+    const expenseCategoryListEl = document.getElementById('expenseCategoryList');
+    // Track selected category when adding an expense
+    let selectedExpenseCategoryId = null;
+
+    const categoryNameEl = document.getElementById('categoryName');
+    const categoryLimitEl = document.getElementById('categoryLimit');
+
+    // Attach quick amount buttons to sum values into expenseAmount input
+    document.querySelectorAll('.quick-amount').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const val = parseFloat(btn.dataset.value);
+        const current = parseFloat(expenseAmountEl.value) || 0;
+        // Add value and keep two decimals
+        const newVal = current + val;
+        expenseAmountEl.value = newVal.toFixed(2);
+      });
+    });
+
+    const configSalaryEl = document.getElementById('configSalary');
+    const configSavingsEl = document.getElementById('configSavings');
+
+    // Variable to keep track of category being edited
+    // Already declared above to avoid TDZ
+
+    // Functions to open modals
+    function openExpenseModal(categoryId = null, transaction = null) {
+      // Populate custom category list instead of a select
+      expenseCategoryListEl.innerHTML = '';
+      // Reset selected category and editing state
+      selectedExpenseCategoryId = null;
+      editingTransactionId = null;
+      state.categories.forEach(cat => {
+        const btn = document.createElement('button');
+        btn.className = 'expense-cat-item';
+        btn.style.backgroundColor = cat.color || '#22c55e';
+        // Show icon next to name if available
+        btn.textContent = (cat.icon ? cat.icon + ' ' : '') + cat.name;
+        btn.dataset.catId = cat.id;
+        btn.addEventListener('click', () => {
+          // Update selected category
+          selectedExpenseCategoryId = cat.id;
+          // Highlight selected
+          Array.from(expenseCategoryListEl.children).forEach(el => el.classList.remove('selected'));
+          btn.classList.add('selected');
+        });
+        expenseCategoryListEl.appendChild(btn);
+        // If preselected by category id
+        if (categoryId && cat.id === categoryId) {
+          selectedExpenseCategoryId = cat.id;
+          btn.classList.add('selected');
+        }
+      });
+      // If editing an existing transaction, pre-fill fields and select its category
+      if (transaction) {
+        expenseConceptEl.value = transaction.concept;
+        expenseAmountEl.value = transaction.amount.toFixed(2);
+        selectedExpenseCategoryId = transaction.categoryId;
+        editingTransactionId = transaction.id;
+        // Highlight the button for this category
+        Array.from(expenseCategoryListEl.children).forEach(el => {
+          if (el.dataset.catId === transaction.categoryId) {
+            el.classList.add('selected');
+          } else {
+            el.classList.remove('selected');
+          }
+        });
+      } else {
+        // Not editing: default blank values
+        expenseConceptEl.value = '';
+        expenseAmountEl.value = '';
+        // If no category selected yet and categories exist, preselect the first one for convenience
+        if (!selectedExpenseCategoryId && state.categories.length > 0) {
+          selectedExpenseCategoryId = state.categories[0].id;
+          const firstBtn = expenseCategoryListEl.children[0];
+          if (firstBtn) firstBtn.classList.add('selected');
+        }
+      }
+      openModal(expenseModal);
+    }
+
+    function openCategoryModal(category = null) {
+      // Always get input elements here to avoid temporal dead zone errors
+      const nameInput = document.getElementById('categoryName');
+      const limitInput = document.getElementById('categoryLimit');
+      // Hidden input to store selected color
+      const colorInput = document.getElementById('categoryColor');
+      // Palette container
+      const paletteEl = document.getElementById('colorPalette');
+      // Prepare default values
+      let initialColor = '#22c55e';
+      if (category) {
+        // Edit existing category
+        editingCategoryId = category.id;
+        document.getElementById('categoryModalTitle').textContent = 'Editar categoría';
+        if (nameInput) nameInput.value = category.name;
+        if (limitInput) limitInput.value = category.limit;
+        initialColor = category.color || initialColor;
+      } else {
+        editingCategoryId = null;
+        document.getElementById('categoryModalTitle').textContent = 'Añadir categoría';
+        if (nameInput) nameInput.value = '';
+        if (limitInput) limitInput.value = '';
+      }
+      // Set hidden input value
+      if (colorInput) colorInput.value = initialColor;
+      // Populate palette
+      if (paletteEl) {
+        paletteEl.innerHTML = '';
+        presetColors.forEach(col => {
+          const swatch = document.createElement('div');
+          swatch.className = 'color-swatch';
+          swatch.style.backgroundColor = col;
+          if (col === initialColor) {
+            swatch.classList.add('selected');
+          }
+          swatch.addEventListener('click', () => {
+            // Update hidden input value
+            if (colorInput) colorInput.value = col;
+            // Remove selection from all swatches
+            Array.from(paletteEl.children).forEach(child => child.classList.remove('selected'));
+            swatch.classList.add('selected');
+          });
+          paletteEl.appendChild(swatch);
+        });
+      }
+      openModal(categoryModal);
+    }
+
+    function openConfigModal() {
+      // Query elements when opening to avoid reliance on global variables
+      const salaryInput = document.getElementById('configSalary');
+      const savingsInput = document.getElementById('configSavings');
+      if (salaryInput) salaryInput.value = state.config.salary || 0;
+      if (savingsInput) savingsInput.value = state.config.savings || 0;
+      openModal(configModal);
+    }
+
+    function openModal(modal) {
+      modal.classList.remove('hidden');
+    }
+
+    function closeModal(modal) {
+      modal.classList.add('hidden');
+    }
+
+    // Save functions
+    function saveExpense() {
+      const concept = expenseConceptEl.value.trim();
+      const amount = parseFloat(expenseAmountEl.value);
+      const categoryId = selectedExpenseCategoryId;
+      if (!concept || isNaN(amount) || !categoryId) {
+        alert('Por favor, rellena todos los campos');
+        return;
+      }
+      // If editing an existing transaction, update it
+      if (editingTransactionId) {
+        const tx = state.transactions.find(t => t.id === editingTransactionId);
+        if (tx) {
+          tx.concept = concept;
+          tx.amount = amount;
+          tx.categoryId = categoryId;
+          // Keep original date
+        }
+        editingTransactionId = null;
+      } else {
+        // Create new transaction
+        const date = new Date();
+        const dateStr = date.toLocaleDateString('es-ES');
+        const transaction = {
+          id: generateId(),
+          concept,
+          amount,
+          categoryId,
+          date: dateStr,
+        };
+        state.transactions.push(transaction);
+      }
+      saveState(state);
+      closeModal(expenseModal);
+      render();
+    }
+
+    function saveCategory() {
+      // Get values directly to avoid reliance on global variables
+      const nameInput = document.getElementById('categoryName');
+      const limitInput = document.getElementById('categoryLimit');
+      const colorInput = document.getElementById('categoryColor');
+      const name = nameInput ? nameInput.value.trim() : '';
+      const limit = limitInput ? parseFloat(limitInput.value) : NaN;
+      const color = colorInput ? colorInput.value : '#22c55e';
+      if (!name || isNaN(limit)) {
+        alert('Por favor, rellena todos los campos');
+        return;
+      }
+      if (editingCategoryId) {
+        // Update existing category
+        const cat = state.categories.find(c => c.id === editingCategoryId);
+        if (cat) {
+          cat.name = name;
+          cat.limit = limit;
+          cat.color = color;
+        }
+      } else {
+        // Add new category
+        state.categories.push({ id: generateId(), name, limit, color, icon: '' });
+      }
+      saveState(state);
+      closeModal(categoryModal);
+      render();
+    }
+
+    function saveConfig() {
+      const salaryInput = document.getElementById('configSalary');
+      const savingsInput = document.getElementById('configSavings');
+      const salary = salaryInput ? parseFloat(salaryInput.value) : NaN;
+      const savings = savingsInput ? parseFloat(savingsInput.value) : NaN;
+      if (isNaN(salary) || isNaN(savings)) {
+        alert('Por favor, rellena todos los campos');
+        return;
+      }
+      state.config.salary = salary;
+      state.config.savings = savings;
+      saveState(state);
+      closeModal(configModal);
+      render();
+    }
+
+    // Delete a transaction by id
+    function deleteTransaction(txId) {
+      if (!confirm('¿Eliminar este gasto?')) return;
+      state.transactions = state.transactions.filter(t => t.id !== txId);
+      saveState(state);
+      render();
+    }
+
+    // Delete category (and its transactions)
+    function deleteCategory(categoryId) {
+      if (!confirm('¿Eliminar esta categoría? Se borrarán los gastos asociados.')) return;
+      // Remove category
+      state.categories = state.categories.filter(cat => cat.id !== categoryId);
+      // Remove transactions of category
+      state.transactions = state.transactions.filter(tx => tx.categoryId !== categoryId);
+      saveState(state);
+      render();
+    }
+
+    // ==================== Calendar functionality ====================
+    const calendarModal = document.getElementById('calendarModal');
+    const calendarMonthYearEl = document.getElementById('calendarMonthYear');
+    const calendarDaysEl = document.getElementById('calendarDays');
+    let currentCalendarYear;
+    let currentCalendarMonth;
+
+    // Open calendar modal initialized to current month
+    function openCalendarModal() {
+      const today = new Date();
+      currentCalendarYear = today.getFullYear();
+      currentCalendarMonth = today.getMonth(); // 0-indexed
+      renderCalendar();
+      openModal(calendarModal);
+    }
+
+    function closeCalendarModal() {
+      closeModal(calendarModal);
+    }
+
+    // Render calendar grid for currentCalendarYear/currentCalendarMonth
+    function renderCalendar() {
+      const monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+      calendarMonthYearEl.textContent = monthNames[currentCalendarMonth] + ' ' + currentCalendarYear;
+      calendarDaysEl.innerHTML = '';
+      // Determine first day of month (Monday=1..Sunday=7)
+      const firstDay = new Date(currentCalendarYear, currentCalendarMonth, 1);
+      let startDay = firstDay.getDay(); // 0=Sunday, 1=Monday...
+      if (startDay === 0) startDay = 7; // treat Sunday as 7
+      const daysInMonth = new Date(currentCalendarYear, currentCalendarMonth + 1, 0).getDate();
+      const daysInPrevMonth = new Date(currentCalendarYear, currentCalendarMonth, 0).getDate();
+      const cells = [];
+      // Days from previous month to fill before first day
+      for (let i = startDay - 1; i > 0; i--) {
+        const date = new Date(currentCalendarYear, currentCalendarMonth - 1, daysInPrevMonth - i + 1);
+        cells.push({ date, other: true });
+      }
+      // Days of current month
+      for (let d = 1; d <= daysInMonth; d++) {
+        const date = new Date(currentCalendarYear, currentCalendarMonth, d);
+        cells.push({ date, other: false });
+      }
+      // Fill remaining cells with next month's days until multiple of 7
+      let nextDayCounter = 1;
+      while (cells.length % 7 !== 0) {
+        const date = new Date(currentCalendarYear, currentCalendarMonth + 1, nextDayCounter);
+        cells.push({ date, other: true });
+        nextDayCounter++;
+      }
+      // Pre-calculate daily totals
+      const dailyTotals = {};
+      state.transactions.forEach(tx => {
+        const parts = tx.date.split('/');
+        const txDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+        const key = txDate.toISOString().split('T')[0];
+        if (!dailyTotals[key]) dailyTotals[key] = 0;
+        dailyTotals[key] += tx.amount;
+      });
+      // Build cells
+      cells.forEach(cell => {
+        const cellDiv = document.createElement('div');
+        cellDiv.className = 'day';
+        if (cell.other) {
+          cellDiv.classList.add('other-month');
+        }
+        const dateNumber = document.createElement('div');
+        dateNumber.className = 'date-number';
+        dateNumber.textContent = cell.date.getDate();
+        cellDiv.appendChild(dateNumber);
+        const iso = cell.date.toISOString().split('T')[0];
+        const total = dailyTotals[iso];
+        const totalEl = document.createElement('div');
+        totalEl.className = 'day-total';
+        totalEl.textContent = total ? `${total.toFixed(2)} €` : '';
+        cellDiv.appendChild(totalEl);
+        // Attach click event to show details for this date
+        cellDiv.addEventListener('click', () => {
+          selectDay(cellDiv, cell.date);
+        });
+        calendarDaysEl.appendChild(cellDiv);
+      });
+    }
+
+    function prevMonth() {
+      currentCalendarMonth--;
+      if (currentCalendarMonth < 0) {
+        currentCalendarMonth = 11;
+        currentCalendarYear--;
+      }
+      renderCalendar();
+    }
+
+    function nextMonth() {
+      currentCalendarMonth++;
+      if (currentCalendarMonth > 11) {
+        currentCalendarMonth = 0;
+        currentCalendarYear++;
+      }
+      renderCalendar();
+    }
+
+    // Keep track of selected day cell
+    let selectedDayCell = null;
+    // Select a day in the calendar and show its details
+    function selectDay(cellElement, dateObj) {
+      // Remove previous selection
+      if (selectedDayCell) {
+        selectedDayCell.classList.remove('selected');
+      }
+      selectedDayCell = cellElement;
+      cellElement.classList.add('selected');
+      showDayDetails(dateObj);
+    }
+
+    // Display the transactions for a specific date in the calendar details area
+    function showDayDetails(dateObj) {
+      const detailsEl = document.getElementById('calendarDetails');
+      if (!detailsEl) return;
+      // Clear previous content
+      detailsEl.innerHTML = '';
+      // Format date for display
+      const options = { day: 'numeric', month: 'long', year: 'numeric' };
+      const dateLabel = dateObj.toLocaleDateString('es-ES', options);
+      const header = document.createElement('h4');
+      header.textContent = `Gastos de ${dateLabel}`;
+      detailsEl.appendChild(header);
+      const dateStr = dateObj.toLocaleDateString('es-ES');
+      // Find transactions matching this date
+      const dayTx = state.transactions.filter(tx => tx.date === dateStr);
+      if (dayTx.length === 0) {
+        const p = document.createElement('p');
+        p.textContent = 'No hay gastos';
+        detailsEl.appendChild(p);
+        return;
+      }
+      const ul = document.createElement('ul');
+      dayTx.forEach(tx => {
+        const li = document.createElement('li');
+        const left = document.createElement('span');
+        const cat = state.categories.find(c => c.id === tx.categoryId);
+        const catName = cat ? cat.name : 'Sin categoría';
+        left.textContent = `${tx.concept} (${catName})`;
+        const right = document.createElement('span');
+        right.className = 'amount';
+        right.textContent = `-${tx.amount.toFixed(2)} €`;
+        li.appendChild(left);
+        li.appendChild(right);
+        ul.appendChild(li);
+      });
+      detailsEl.appendChild(ul);
+    }
+
+    // Register calendar event listeners
+    // Register calendar open button if present (may be hidden on mobile)
+    {
+      const btnCal = document.getElementById('openCalendar');
+      if (btnCal) btnCal.addEventListener('click', openCalendarModal);
+    }
+    document.getElementById('closeCalendar').addEventListener('click', closeCalendarModal);
+    document.getElementById('prevMonth').addEventListener('click', (e) => { e.stopPropagation(); prevMonth(); });
+    document.getElementById('nextMonth').addEventListener('click', (e) => { e.stopPropagation(); nextMonth(); });
+
+    // Render summary
+    function renderSummary() {
+      const totalSpent = state.transactions.reduce((sum, tx) => sum + tx.amount, 0);
+      const salary = state.config.salary || 0;
+      const savings = state.config.savings || 0;
+      const available = salary - savings - totalSpent;
+      salaryAmountEl.textContent = `${salary.toFixed(2)} €`;
+      savingsAmountEl.textContent = `${savings.toFixed(2)} €`;
+      spentAmountEl.textContent = `${totalSpent.toFixed(2)} €`;
+      availableAmountEl.textContent = `${available.toFixed(2)} €`;
+      // Color code for available amount
+      if (available > 0) {
+        availableAmountEl.style.color = '#22c55e';
+      } else if (available < 0) {
+        availableAmountEl.style.color = '#ef4444';
+      } else {
+        availableAmountEl.style.color = '#facc15';
+      }
+    }
+
+    // Render categories with progress bars and edit/delete options
+    function renderCategories() {
+      categoriesListEl.innerHTML = '';
+      state.categories.forEach(cat => {
+        // Calculate spent for category
+        const spent = state.transactions
+          .filter(tx => tx.categoryId === cat.id)
+          .reduce((sum, tx) => sum + tx.amount, 0);
+        const limit = cat.limit;
+        const percentage = limit > 0 ? spent / limit : 0;
+        // Create card
+        const card = document.createElement('div');
+        card.className = 'category-card';
+        // Header with name and actions
+        const header = document.createElement('div');
+        header.className = 'category-header';
+        // Add icon element if available
+        const iconEl = document.createElement('span');
+        iconEl.className = 'category-icon';
+        // Use the category's icon property if defined, otherwise blank
+        iconEl.textContent = cat.icon || '';
+        const title = document.createElement('h3');
+        title.textContent = cat.name;
+        // Wrap icon and title together so they stay aligned to the left
+        const nameContainer = document.createElement('div');
+        nameContainer.className = 'category-name';
+        nameContainer.appendChild(iconEl);
+        nameContainer.appendChild(title);
+        header.appendChild(nameContainer);
+        const actions = document.createElement('div');
+        // Edit button
+        const editBtn = document.createElement('button');
+        editBtn.textContent = 'Editar';
+        // Stop propagation so clicking the button does not trigger the card click handler
+        editBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openCategoryModal(cat);
+        });
+        actions.appendChild(editBtn);
+        // Delete button
+        const delBtn = document.createElement('button');
+        delBtn.textContent = 'Eliminar';
+        delBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          deleteCategory(cat.id);
+        });
+        actions.appendChild(delBtn);
+        header.appendChild(actions);
+        card.appendChild(header);
+        // Progress bar container
+        const pbContainer = document.createElement('div');
+        pbContainer.className = 'progress-bar-container';
+        const pb = document.createElement('div');
+        pb.className = 'progress-bar';
+        // Set color: use category's chosen color by default, override for thresholds
+        let color = cat.color || '#22c55e';
+        // If base color is pure white, adjust to light gray for visibility on dark background
+        if (color.toLowerCase() === '#ffffff' || color.toLowerCase() === 'white') {
+          color = '#f1f5f9';
+        }
+        if (percentage >= 1) {
+          color = '#ef4444'; // red when over limit
+        } else if (percentage >= 0.8) {
+          color = '#facc15'; // yellow when near limit
+        }
+        pb.style.backgroundColor = color;
+        pb.style.width = `${Math.min(percentage, 1) * 100}%`;
+        pbContainer.appendChild(pb);
+        card.appendChild(pbContainer);
+        // Progress info and percentage
+        const info = document.createElement('div');
+        info.className = 'progress-info';
+        const spentLabel = document.createElement('span');
+        spentLabel.textContent = `Gastado: ${spent.toFixed(2)} €`;
+        const limitLabel = document.createElement('span');
+        limitLabel.textContent = `Límite: ${limit.toFixed(2)} €`;
+        const pctLabel = document.createElement('span');
+        const pctValue = limit > 0 ? (percentage * 100).toFixed(0) : '0';
+        pctLabel.textContent = `${pctValue}%`;
+        // Append labels: spent on left, percentage center, limit right
+        info.appendChild(spentLabel);
+        info.appendChild(pctLabel);
+        info.appendChild(limitLabel);
+        card.appendChild(info);
+        // Clicking on the card opens the expense modal preselecting this category
+        card.addEventListener('click', function () {
+          openExpenseModal(cat.id);
+        });
+        categoriesListEl.appendChild(card);
+      });
+    }
+
+    // Render transactions list
+    function renderTransactions() {
+      transactionsListEl.innerHTML = '';
+      // sort by date descending (recent first)
+      const sortedTx = [...state.transactions].sort((a, b) => {
+        // convert dd/mm/yyyy to yyyy-mm-dd for Date parsing
+        const [dayA, monthA, yearA] = a.date.split('/');
+        const [dayB, monthB, yearB] = b.date.split('/');
+        const dateA = new Date(`${yearA}-${monthA}-${dayA}`);
+        const dateB = new Date(`${yearB}-${monthB}-${dayB}`);
+        return dateB - dateA;
+      });
+      sortedTx.forEach(tx => {
+        const li = document.createElement('li');
+        li.className = 'transaction';
+        const left = document.createElement('div');
+        left.className = 'trans-left';
+        const cat = state.categories.find(c => c.id === tx.categoryId);
+        const catName = cat ? cat.name : 'Sin categoría';
+        const conceptEl = document.createElement('span');
+        conceptEl.textContent = tx.concept;
+        const metaEl = document.createElement('span');
+        metaEl.textContent = `${catName} · ${tx.date}`;
+        left.appendChild(conceptEl);
+        left.appendChild(metaEl);
+        li.appendChild(left);
+        // Amount
+        const amountEl = document.createElement('div');
+        amountEl.className = 'trans-right';
+        amountEl.textContent = `-${tx.amount.toFixed(2)} €`;
+        li.appendChild(amountEl);
+        // Add edit/delete buttons
+        const actions = document.createElement('div');
+        actions.className = 'trans-actions';
+        const editBtn = document.createElement('button');
+        editBtn.textContent = 'Editar';
+        editBtn.className = 'transaction-action';
+        editBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openExpenseModal(null, tx);
+        });
+        const delBtn = document.createElement('button');
+        delBtn.textContent = 'Eliminar';
+        delBtn.className = 'transaction-action';
+        delBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          deleteTransaction(tx.id);
+        });
+        actions.appendChild(editBtn);
+        actions.appendChild(delBtn);
+        li.appendChild(actions);
+        transactionsListEl.appendChild(li);
+      });
+    }
+
+    // Render charts (pie and bar) using canvas
+    function renderCharts() {
+      const pieCanvas = document.getElementById('pieChart');
+      const barCanvas = document.getElementById('barChart');
+      if (!pieCanvas || !barCanvas) return;
+      const pieCtx = pieCanvas.getContext('2d');
+      const barCtx = barCanvas.getContext('2d');
+      // Calculate totals per category
+      // Build totals including category color so pie slices match the category bars
+      const totals = state.categories.map(cat => {
+        const spent = state.transactions
+          .filter(tx => tx.categoryId === cat.id)
+          .reduce((sum, tx) => sum + tx.amount, 0);
+        return { name: cat.name, spent, color: cat.color || '#22c55e' };
+      }).filter(item => item.spent > 0);
+      const totalSpent = totals.reduce((sum, item) => sum + item.spent, 0);
+      // Clear previous drawings
+      pieCtx.clearRect(0, 0, pieCanvas.width, pieCanvas.height);
+      barCtx.clearRect(0, 0, barCanvas.width, barCanvas.height);
+      // Colors for slices come from categories; lighten white if necessary for readability
+      const colors = totals.map(item => {
+        let c = item.color || '#22c55e';
+        // If color is pure white, use a slightly darker shade so slice is visible
+        if (c.toLowerCase() === '#ffffff' || c.toLowerCase() === 'white') {
+          return '#f1f5f9';
+        }
+        return c;
+      });
+      // Draw pie chart
+      const cx = pieCanvas.width / 2;
+      const cy = pieCanvas.height / 2;
+      const radius = Math.min(cx, cy) * 0.8;
+      let startAngle = -Math.PI / 2;
+      totals.forEach((item, index) => {
+        const angle = (item.spent / totalSpent) * Math.PI * 2;
+        pieCtx.beginPath();
+        pieCtx.moveTo(cx, cy);
+        pieCtx.arc(cx, cy, radius, startAngle, startAngle + angle, false);
+        pieCtx.closePath();
+        pieCtx.fillStyle = colors[index % colors.length];
+        pieCtx.fill();
+        startAngle += angle;
+      });
+      // Draw legend
+      const legend = document.getElementById('pieLegend');
+      if (legend) {
+        legend.innerHTML = '';
+        totals.forEach((item, index) => {
+          const row = document.createElement('div');
+          row.style.display = 'flex';
+          row.style.alignItems = 'center';
+          row.style.marginBottom = '2px';
+          const colorBox = document.createElement('span');
+          colorBox.style.display = 'inline-block';
+          colorBox.style.width = '12px';
+          colorBox.style.height = '12px';
+          colorBox.style.marginRight = '6px';
+          colorBox.style.backgroundColor = colors[index % colors.length];
+          row.appendChild(colorBox);
+          const text = document.createElement('span');
+          const pct = totalSpent > 0 ? ((item.spent / totalSpent) * 100).toFixed(1) : '0.0';
+          // Show absolute spent and percentage
+          text.textContent = `${item.name}: ${item.spent.toFixed(2)} € (${pct}% )`;
+          row.appendChild(text);
+          legend.appendChild(row);
+        });
+      }
+      // Draw bar chart for last 6 months
+      // Aggregate monthly totals
+      const monthTotals = {};
+      state.transactions.forEach(tx => {
+        const [day, month, year] = tx.date.split('/');
+        const key = `${year}-${month}`;
+        if (!monthTotals[key]) monthTotals[key] = 0;
+        monthTotals[key] += tx.amount;
+      });
+      const keys = Object.keys(monthTotals).sort();
+      const lastKeys = keys.slice(-6);
+      const maxVal = lastKeys.reduce((max, k) => Math.max(max, monthTotals[k]), 0) || 1;
+      const barWidth = barCanvas.width / lastKeys.length * 0.6;
+      const barSpacing = barCanvas.width / lastKeys.length;
+      const chartHeight = barCanvas.height * 0.6;
+      lastKeys.forEach((key, index) => {
+        const value = monthTotals[key];
+        const barHeight = (value / maxVal) * chartHeight;
+        const x = barSpacing * index + (barSpacing - barWidth) / 2;
+        const y = barCanvas.height - barHeight - 20;
+        barCtx.fillStyle = '#22c55e';
+        barCtx.fillRect(x, y, barWidth, barHeight);
+        barCtx.fillStyle = '#cbd5e1';
+        barCtx.font = '10px sans-serif';
+        barCtx.textAlign = 'center';
+        const [yearStr, monthStr] = key.split('-');
+        const monthIndex = parseInt(monthStr, 10) - 1;
+        const monthNamesShort = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+        const label = monthNamesShort[monthIndex];
+        barCtx.fillText(label, x + barWidth / 2, barCanvas.height - 5);
+        barCtx.fillText(`${value.toFixed(0)}€`, x + barWidth / 2, y - 5);
+      });
+    }
+
+    // Render savings section showing total accumulated savings and monthly breakdown
+    function renderGoal() {
+      if (!monthlySavingsListEl || !totalSavingsCardEl) return;
+      const monthlySaving = state.config.savings || 0;
+      const monthNames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+      const today = new Date();
+      const currentMonthIndex = today.getMonth(); // 0-based
+      // Clear previous contents
+      monthlySavingsListEl.innerHTML = '';
+      totalSavingsCardEl.innerHTML = '';
+      // If there is no monthly saving configured, show message and stop
+      if (!monthlySaving || monthlySaving <= 0) {
+        totalSavingsCardEl.textContent = 'No has registrado un ahorro mensual';
+        monthlySavingsListEl.textContent = '';
+        return;
+      }
+      // Build monthly boxes and accumulate total
+      let totalAccum = 0;
+      monthlySavingsListEl.innerHTML = '';
+      for (let m = 0; m <= currentMonthIndex; m++) {
+        totalAccum += monthlySaving;
+        const box = document.createElement('div');
+        box.className = 'month-savings-box';
+        box.textContent = `${monthNames[m]}: ${monthlySaving.toFixed(2)} €`;
+        monthlySavingsListEl.appendChild(box);
+      }
+      // Create goal summary card with progress bar
+      const goalName = state.config.goalName || 'Objetivo';
+      const goalAmount = state.config.goalAmount || 0;
+      // Clear total savings card
+      totalSavingsCardEl.innerHTML = '';
+      const summary = document.createElement('div');
+      summary.className = 'goal-summary';
+      const title = document.createElement('div');
+      title.textContent = `${goalName}: ${totalAccum.toFixed(2)} €`; // show saved so far
+      title.style.fontSize = '1.2rem';
+      title.style.marginBottom = '0.4rem';
+      summary.appendChild(title);
+      if (goalAmount > 0) {
+        const progressPct = Math.min(totalAccum / goalAmount, 1);
+        const progInfo = document.createElement('div');
+        progInfo.style.fontSize = '0.8rem';
+        progInfo.style.marginBottom = '0.3rem';
+        progInfo.textContent = `Objetivo: ${goalAmount.toFixed(2)} € · Progreso: ${(progressPct * 100).toFixed(1)}%`;
+        summary.appendChild(progInfo);
+        // Progress bar container
+        const progContainer = document.createElement('div');
+        progContainer.className = 'goal-progress-container';
+        const progBar = document.createElement('div');
+        progBar.className = 'goal-progress-bar';
+        progBar.style.width = `${progressPct * 100}%`;
+        progContainer.appendChild(progBar);
+        summary.appendChild(progContainer);
+      }
+      totalSavingsCardEl.appendChild(summary);
+    }
+
+    // Main render function
+    function render() {
+      renderSummary();
+      renderCategories();
+      renderTransactions();
+    }
+
+    // Initial render
+    render();
+
+    // Expose modal functions globally for inline handlers
+    window.openExpenseModal = openExpenseModal;
+    window.openCategoryModal = openCategoryModal;
+    window.openConfigModal = openConfigModal;
+    window.openCalendarModal = openCalendarModal;
+    window.closeCalendarModal = closeCalendarModal;
+
+    // Register service worker for offline PWA support
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('service-worker.js').catch(err => {
+          console.warn('Service worker registration failed', err);
+        });
+      });
+    }
+  </script>
+</body>
+</html>
