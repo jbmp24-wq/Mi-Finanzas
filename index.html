@@ -50,23 +50,32 @@
     </section>
 
     <!-- Charts section (hidden by default) -->
-    <section id="chartsSection" class="card hidden">
+    <section id="chartsSection" class="card">
       <h2>Gráficas</h2>
-      <div class="chart-container">
-        <canvas id="pieChart" width="300" height="200"></canvas>
-        <div id="pieLegend"></div>
-        <canvas id="barChart" width="300" height="200"></canvas>
+      <!-- Horizontal layout: pie chart on left, legend in middle, bar chart on right -->
+      <div class="chart-row">
+        <div class="chart-col pie-col">
+          <canvas id="pieChart" width="260" height="260"></canvas>
+        </div>
+        <div class="chart-col legend-col">
+          <div id="pieLegend" class="pie-legend"></div>
+        </div>
       </div>
     </section>
 
     <!-- Goals/savings section (hidden by default) -->
-    <section id="goalsSection" class="card hidden">
+    <section id="goalsSection" class="card">
       <h2>Ahorro</h2>
-      <!-- Card showing total savings -->
+      <!-- Card showing total savings and leftover -->
       <div id="totalSavingsCard" class="goal-total-card"></div>
       <!-- List of monthly savings will be populated here -->
       <div id="monthlySavingsList" class="savings-list"></div>
-      <button id="editGoal" class="secondary-btn">Editar objetivo</button>
+      <!-- Dynamic list of goals with assigned amounts and progress -->
+      <div id="goalsList" class="goals-list"></div>
+      <div class="goal-actions">
+        <button id="addGoal" class="primary-btn">Añadir objetivo</button>
+        <button id="editGoal" class="secondary-btn">Editar ahorro mensual</button>
+      </div>
     </section>
   </main>
 
@@ -132,6 +141,8 @@
       <div class="modal-actions">
         <button id="saveExpense" class="primary-btn">Guardar</button>
         <button id="cancelExpense" class="secondary-btn">Cancelar</button>
+        <!-- Delete button will be shown only when editing an existing transaction -->
+        <button id="deleteExpense" class="danger-btn" style="display: none;">Eliminar</button>
       </div>
     </div>
   </div>
@@ -162,7 +173,7 @@
     </div>
   </div>
 
-    <!-- Modal for editing configuration (salary and savings) -->
+    <!-- Modal for editing configuration (salary, monthly and initial savings) -->
     <div id="configModal" class="modal hidden">
       <div class="modal-content">
         <h3>Editar valores</h3>
@@ -174,6 +185,10 @@
           Ahorro mensual (€)
           <input type="number" id="configSavings" min="0" step="0.01" />
         </label>
+        <label>
+          Ahorro inicial (€)
+          <input type="number" id="configInitial" min="0" step="0.01" />
+        </label>
         <div class="modal-actions">
           <button id="saveConfig" class="primary-btn">Guardar</button>
           <button id="cancelConfig" class="secondary-btn">Cancelar</button>
@@ -181,32 +196,28 @@
       </div>
     </div>
 
-    <!-- Modal for calendar view -->
-    <div id="calendarModal" class="modal hidden">
-      <div class="modal-content calendar-modal">
-        <div class="calendar-header">
-          <button id="prevMonth" class="secondary-btn" aria-label="Mes anterior">&lt;</button>
-          <h3 id="calendarMonthYear">Mes Año</h3>
-          <button id="nextMonth" class="secondary-btn" aria-label="Mes siguiente">&gt;</button>
-        </div>
-        <div class="calendar-grid">
-          <div class="calendar-weekdays">
-            <div>Lun</div>
-            <div>Mar</div>
-            <div>Mié</div>
-            <div>Jue</div>
-            <div>Vie</div>
-            <div>Sáb</div>
-            <div>Dom</div>
-          </div>
-          <div id="calendarDays" class="calendar-days"></div>
-        </div>
-        <div id="calendarDetails" class="calendar-details"></div>
-        <div class="modal-actions">
-          <button id="closeCalendar" class="secondary-btn">Cerrar</button>
-        </div>
+    <!-- Calendar section (acts as a separate page) -->
+    <section id="calendarSection" class="card">
+      <h2>Calendario</h2>
+      <div class="calendar-header">
+        <button id="prevMonth" class="secondary-btn" aria-label="Mes anterior">&lt;</button>
+        <h3 id="calendarMonthYear">Mes Año</h3>
+        <button id="nextMonth" class="secondary-btn" aria-label="Mes siguiente">&gt;</button>
       </div>
-    </div>
+      <div class="calendar-grid">
+        <div class="calendar-weekdays">
+          <div>Lun</div>
+          <div>Mar</div>
+          <div>Mié</div>
+          <div>Jue</div>
+          <div>Vie</div>
+          <div>Sáb</div>
+          <div>Dom</div>
+        </div>
+        <div id="calendarDays" class="calendar-days"></div>
+      </div>
+      <div id="calendarDetails" class="calendar-details"></div>
+    </section>
 
     <!-- Modal for editing savings goal -->
     <div id="goalModal" class="modal hidden">
@@ -223,6 +234,25 @@
         <div class="modal-actions">
           <button id="saveGoal" class="primary-btn">Guardar</button>
           <button id="cancelGoal" class="secondary-btn">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal for adding a new goal -->
+    <div id="newGoalModal" class="modal hidden">
+      <div class="modal-content">
+        <h3>Añadir nuevo objetivo</h3>
+        <label>
+          Nombre del objetivo
+          <input type="text" id="newGoalName" />
+        </label>
+        <label>
+          Objetivo (€)
+          <input type="number" id="newGoalAmount" min="0" step="0.01" />
+        </label>
+        <div class="modal-actions">
+          <button id="saveNewGoal" class="primary-btn">Guardar</button>
+          <button id="cancelNewGoal" class="secondary-btn">Cancelar</button>
         </div>
       </div>
     </div>
@@ -246,10 +276,11 @@
         console.warn('localStorage not accessible', err);
       }
       // Default state
-      return {
+        return {
         config: {
           salary: 0,
           savings: 0,
+          initialSavings: 0,
         },
         categories: [],
         transactions: [],
@@ -273,21 +304,113 @@
     // Global state variable
     let state = loadState();
 
+    // Ensure monthly savings array exists for storing real monthly savings
+    if (!state.monthlySavings) {
+      state.monthlySavings = [];
+    }
+
+    // Helper to compute month key string YYYY-MM
+    function getMonthKey(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      return `${year}-${month}`;
+    }
+
+    // Perform monthly reset: if the stored last reset month is older than the current month,
+    // move transactions from previous months into history and compute real savings
+    function checkMonthlyReset() {
+      const now = new Date();
+      const currentMonthKey = getMonthKey(now);
+      // If lastResetMonth not set, initialize it to current month
+      if (!state.lastResetMonth) {
+        state.lastResetMonth = currentMonthKey;
+        saveState(state);
+        return;
+      }
+      // If current month is same as last reset, nothing to do
+      if (state.lastResetMonth === currentMonthKey) {
+        return;
+      }
+      // Parse last reset date
+      const [lastYearStr, lastMonthStr] = state.lastResetMonth.split('-');
+      let iterYear = parseInt(lastYearStr, 10);
+      let iterMonth = parseInt(lastMonthStr, 10) - 1; // zero-indexed month
+      // Iterate through months until the month before current
+      while (iterYear < now.getFullYear() || (iterYear === now.getFullYear() && iterMonth < now.getMonth())) {
+        // Compute savings for this month
+        const monthKey = `${iterYear}-${String(iterMonth + 1).padStart(2, '0')}`;
+        // Sum transactions for this month
+        let monthSpent = 0;
+        state.transactions.forEach(tx => {
+          const [day, month, year] = tx.date.split('/');
+          const txKey = `${year}-${month.padStart(2, '0')}`;
+          if (txKey === monthKey) {
+            monthSpent += tx.amount;
+          }
+        });
+        // Salary for this month; if undefined, treat as 0
+        const monthlyIncome = state.config.salary || 0;
+        const actualSaving = monthlyIncome - monthSpent;
+        // Push into monthlySavings history
+        state.monthlySavings.push({ month: monthKey, amount: actualSaving });
+        // Remove transactions for this month from state.transactions
+        state.transactions = state.transactions.filter(tx => {
+          const [d, m, y] = tx.date.split('/');
+          const key = `${y}-${m.padStart(2, '0')}`;
+          return key !== monthKey;
+        });
+        // Move to next month
+        iterMonth++;
+        if (iterMonth > 11) {
+          iterMonth = 0;
+          iterYear++;
+        }
+      }
+      // Update lastResetMonth to current month
+      state.lastResetMonth = currentMonthKey;
+      saveState(state);
+    }
+
+
+    // Ensure goals array exists in state for handling multiple savings targets
+    if (!state.goals) {
+      state.goals = [];
+    }
+
+    // Perform monthly reset on application load
+    checkMonthlyReset();
+
     // Ensure default categories exist. If categories array is empty or missing any default
     {
       const defaults = [
-        { name: 'Comida', limit: 0, color: '#22c55e', icon: '🍽️' },
-        { name: 'Cena con amigos', limit: 0, color: '#3b82f6', icon: '🍷' },
-        { name: 'Ocio', limit: 0, color: '#facc15', icon: '🎉' },
-        { name: 'Coche', limit: 0, color: '#ec4899', icon: '🚗' },
-        { name: 'Gasolina', limit: 0, color: '#8b5cf6', icon: '⛽' },
-        { name: 'Lucía', limit: 0, color: '#ffffff', icon: '🤍' }
+        // Predefined categories with fixed colors matching the design
+        { name: 'Comida', limit: 0, color: '#facc15', icon: '🍽️' }, // yellow
+        { name: 'Cena con amigos', limit: 0, color: '#22c55e', icon: '🍷' }, // green
+        { name: 'Ocio', limit: 0, color: '#3b82f6', icon: '🎉' }, // blue
+        { name: 'Coche', limit: 0, color: '#64748b', icon: '🚗' }, // gray
+        { name: 'Gasolina', limit: 0, color: '#92400e', icon: '⛽' }, // brown
+        { name: 'Lucía', limit: 0, color: '#ffffff', icon: '🤍' }, // white
+        { name: 'Ropa', limit: 0, color: '#ec4899', icon: '👚' } // pink
       ];
       if (!state.categories) state.categories = [];
       defaults.forEach(def => {
         const exists = state.categories.some(cat => cat.name === def.name);
         if (!exists) {
           state.categories.push({ id: generateId(), name: def.name, limit: def.limit, color: def.color, icon: def.icon });
+        }
+      });
+      // Update existing categories with missing icon or color to ensure consistency
+      state.categories.forEach(cat => {
+        const def = defaults.find(d => d.name === cat.name);
+        if (def) {
+          // If icon is missing, set from defaults
+          if (!cat.icon || cat.icon.trim() === '') {
+            cat.icon = def.icon;
+          }
+          // If color is missing or matches an old palette, update color to default but preserve limit
+          if (!cat.color || cat.color.trim() === '') {
+            cat.color = def.color;
+          }
         }
       });
       // Persist added defaults
@@ -299,6 +422,15 @@
 
     // Track which transaction is being edited.  When null, a new transaction will be added.
     var editingTransactionId = null;
+
+    // Function to delete the currently editing transaction
+    function deleteExpense() {
+      if (editingTransactionId) {
+        deleteTransaction(editingTransactionId);
+        editingTransactionId = null;
+        closeModal(expenseModal);
+      }
+    }
 
     // Debug indicator has served its purpose; no longer needed. Uncomment below for troubleshooting.
     /*
@@ -346,20 +478,38 @@
       state.config.goalAmount = 0;
     }
 
+    // Ensure initialSavings exists in config
+    if (state.config.initialSavings === undefined) {
+      state.config.initialSavings = 0;
+    }
+
     // Sections and navigation references
     const summarySection = document.getElementById('summary');
     const categoriesSection = document.getElementById('categories');
     const transactionsSection = document.getElementById('transactions');
     const chartsSection = document.getElementById('chartsSection');
     const goalsSection = document.getElementById('goalsSection');
+    const calendarSection = document.getElementById('calendarSection');
     // Elements for savings display
     const monthlySavingsListEl = document.getElementById('monthlySavingsList');
     const totalSavingsCardEl = document.getElementById('totalSavingsCard');
     const navButtons = document.querySelectorAll('#bottomNav .nav-btn');
     const goalModal = document.getElementById('goalModal');
+    const newGoalModal = document.getElementById('newGoalModal');
+
+    // Hide calendar section by default (it has no 'hidden' class)
+    if (calendarSection) {
+      calendarSection.style.display = 'none';
+    }
+
+    // Hide charts and goals sections by default so they don't appear on the home page
+    if (chartsSection) chartsSection.style.display = 'none';
+    if (goalsSection) goalsSection.style.display = 'none';
 
     // Define a set of preset colors for category selection.  Include white as a neutral option
-    const presetColors = ['#22c55e', '#3b82f6', '#facc15', '#ec4899', '#8b5cf6', '#f97316', '#10b981', '#e11d48', '#ffffff'];
+    // Define preset colors for categories.  Include black, gray and brown.  Removed duplicate greenish-blue.
+    // Preset colors ordered from lightest to darkest for a coherent palette
+    const presetColors = ['#ffffff', '#facc15', '#ec4899', '#22c55e', '#3b82f6', '#8b5cf6', '#f97316', '#92400e', '#475569', '#000000'];
 
     // Navigation switching function
     function switchPage(page) {
@@ -367,33 +517,40 @@
         btn.classList.toggle('active', btn.dataset.page === page);
       });
       if (page === 'home') {
+        // Show only the home sections: summary, categories and transactions
         summarySection.style.display = '';
         categoriesSection.style.display = '';
         transactionsSection.style.display = '';
         chartsSection.style.display = 'none';
         goalsSection.style.display = 'none';
+        if (calendarSection) calendarSection.style.display = 'none';
         render();
       } else if (page === 'calendar') {
-        // Show home sections so the calendar modal overlays correctly
-        summarySection.style.display = '';
-        categoriesSection.style.display = '';
-        transactionsSection.style.display = '';
+        // Hide all main sections and show only the calendar page
+        summarySection.style.display = 'none';
+        categoriesSection.style.display = 'none';
+        transactionsSection.style.display = 'none';
         chartsSection.style.display = 'none';
         goalsSection.style.display = 'none';
-        openCalendarModal();
+        if (calendarSection) calendarSection.style.display = '';
+        initializeCalendar();
       } else if (page === 'charts') {
+        // Show only charts section
         summarySection.style.display = 'none';
         categoriesSection.style.display = 'none';
         transactionsSection.style.display = 'none';
         chartsSection.style.display = '';
         goalsSection.style.display = 'none';
+        if (calendarSection) calendarSection.style.display = 'none';
         renderCharts();
       } else if (page === 'goals') {
+        // Show only goals (savings) section
         summarySection.style.display = 'none';
         categoriesSection.style.display = 'none';
         transactionsSection.style.display = 'none';
         chartsSection.style.display = 'none';
         goalsSection.style.display = '';
+        if (calendarSection) calendarSection.style.display = 'none';
         renderGoal();
       }
     }
@@ -433,11 +590,99 @@
 
     // Attach goal modal buttons
     const editGoalBtn = document.getElementById('editGoal');
-    if (editGoalBtn) editGoalBtn.addEventListener('click', openGoalModal);
+    if (editGoalBtn) editGoalBtn.addEventListener('click', openConfigModal);
     const cancelGoalBtn = document.getElementById('cancelGoal');
     if (cancelGoalBtn) cancelGoalBtn.addEventListener('click', () => closeModal(goalModal));
     const saveGoalBtn = document.getElementById('saveGoal');
     if (saveGoalBtn) saveGoalBtn.addEventListener('click', saveGoal);
+
+    // New goal modal functions
+    // Track which goal item is being edited when using the new goal modal
+    var editingGoalItemId = null;
+
+    function openNewGoalModal() {
+      const nameInput = document.getElementById('newGoalName');
+      const amountInput = document.getElementById('newGoalAmount');
+      // Clear editing state for adding a new goal
+      editingGoalItemId = null;
+      if (nameInput) nameInput.value = '';
+      if (amountInput) amountInput.value = '';
+      openModal(newGoalModal);
+    }
+
+    // Open modal for editing an existing goal item
+    function openEditGoalItem(goal) {
+      const nameInput = document.getElementById('newGoalName');
+      const amountInput = document.getElementById('newGoalAmount');
+      editingGoalItemId = goal.id;
+      if (nameInput) nameInput.value = goal.name;
+      if (amountInput) amountInput.value = goal.amount;
+      openModal(newGoalModal);
+    }
+
+    function saveNewGoal() {
+      const nameInput = document.getElementById('newGoalName');
+      const amountInput = document.getElementById('newGoalAmount');
+      const nameVal = nameInput ? nameInput.value.trim() : '';
+      const amountVal = amountInput ? parseFloat(amountInput.value) : NaN;
+      if (!nameVal || isNaN(amountVal) || amountVal <= 0) {
+        alert('Por favor, ingresa un nombre y una cantidad válidos');
+        return;
+      }
+      if (editingGoalItemId) {
+        // Update existing goal
+        const goal = state.goals.find(g => g.id === editingGoalItemId);
+        if (goal) {
+          goal.name = nameVal;
+          goal.amount = amountVal;
+          // If assigned amount exceeds new target, clamp it
+          if (goal.assigned > amountVal) {
+            goal.assigned = amountVal;
+          }
+        }
+        editingGoalItemId = null;
+      } else {
+        // Add new goal with zero assigned
+        state.goals.push({ id: generateId(), name: nameVal, amount: amountVal, assigned: 0 });
+      }
+      saveState(state);
+      closeModal(newGoalModal);
+      renderGoal();
+    }
+
+    // Attach new goal modal buttons
+    const addGoalBtn = document.getElementById('addGoal');
+    if (addGoalBtn) addGoalBtn.addEventListener('click', openNewGoalModal);
+    const cancelNewGoalBtn = document.getElementById('cancelNewGoal');
+    if (cancelNewGoalBtn) cancelNewGoalBtn.addEventListener('click', () => closeModal(newGoalModal));
+    const saveNewGoalBtn = document.getElementById('saveNewGoal');
+    if (saveNewGoalBtn) saveNewGoalBtn.addEventListener('click', saveNewGoal);
+
+    // Update assigned amount for a goal ensuring the total does not exceed total savings
+    function updateGoalAssigned(goalId, newVal) {
+      // Total available savings come from the accumulated historical savings plus initial savings
+      const totalSavings = (state.config.initialSavings || 0) + state.monthlySavings.reduce((sum, m) => sum + (m.amount || 0), 0);
+      // Sum assigned amounts excluding this goal
+      let otherAssigned = 0;
+      state.goals.forEach(g => {
+        if (g.id !== goalId) {
+          otherAssigned += parseFloat(g.assigned || 0);
+        }
+      });
+      if (newVal + otherAssigned > totalSavings) {
+        alert('La suma asignada supera el total ahorrado');
+        // Re-render to reset input values
+        renderGoal();
+        return;
+      }
+      // Update assigned amount on this goal
+      const goal = state.goals.find(g => g.id === goalId);
+      if (goal) {
+        goal.assigned = newVal;
+      }
+      saveState(state);
+      renderGoal();
+    }
 
     document.getElementById('cancelExpense').addEventListener('click', () => closeModal(expenseModal));
     document.getElementById('cancelCategory').addEventListener('click', () => closeModal(categoryModal));
@@ -446,6 +691,10 @@
     document.getElementById('saveExpense').addEventListener('click', saveExpense);
     document.getElementById('saveCategory').addEventListener('click', saveCategory);
     document.getElementById('saveConfig').addEventListener('click', saveConfig);
+
+    // Attach delete expense button
+    const deleteExpenseBtn = document.getElementById('deleteExpense');
+    if (deleteExpenseBtn) deleteExpenseBtn.addEventListener('click', deleteExpense);
 
     // Input elements
     const expenseConceptEl = document.getElementById('expenseConcept');
@@ -528,6 +777,15 @@
           if (firstBtn) firstBtn.classList.add('selected');
         }
       }
+      // Show or hide delete button based on whether editing
+      const delBtn = document.getElementById('deleteExpense');
+      if (delBtn) {
+        if (transaction) {
+          delBtn.style.display = '';
+        } else {
+          delBtn.style.display = 'none';
+        }
+      }
       openModal(expenseModal);
     }
 
@@ -583,8 +841,10 @@
       // Query elements when opening to avoid reliance on global variables
       const salaryInput = document.getElementById('configSalary');
       const savingsInput = document.getElementById('configSavings');
+      const initialInput = document.getElementById('configInitial');
       if (salaryInput) salaryInput.value = state.config.salary || 0;
       if (savingsInput) savingsInput.value = state.config.savings || 0;
+      if (initialInput) initialInput.value = state.config.initialSavings || 0;
       openModal(configModal);
     }
 
@@ -665,14 +925,19 @@
     function saveConfig() {
       const salaryInput = document.getElementById('configSalary');
       const savingsInput = document.getElementById('configSavings');
+      const initialInput = document.getElementById('configInitial');
       const salary = salaryInput ? parseFloat(salaryInput.value) : NaN;
       const savings = savingsInput ? parseFloat(savingsInput.value) : NaN;
+      const initial = initialInput ? parseFloat(initialInput.value) : NaN;
       if (isNaN(salary) || isNaN(savings)) {
         alert('Por favor, rellena todos los campos');
         return;
       }
       state.config.salary = salary;
       state.config.savings = savings;
+      if (!isNaN(initial)) {
+        state.config.initialSavings = initial;
+      }
       saveState(state);
       closeModal(configModal);
       render();
@@ -680,7 +945,6 @@
 
     // Delete a transaction by id
     function deleteTransaction(txId) {
-      if (!confirm('¿Eliminar este gasto?')) return;
       state.transactions = state.transactions.filter(t => t.id !== txId);
       saveState(state);
       render();
@@ -698,23 +962,18 @@
     }
 
     // ==================== Calendar functionality ====================
-    const calendarModal = document.getElementById('calendarModal');
+    // Calendar elements
     const calendarMonthYearEl = document.getElementById('calendarMonthYear');
     const calendarDaysEl = document.getElementById('calendarDays');
     let currentCalendarYear;
     let currentCalendarMonth;
 
-    // Open calendar modal initialized to current month
-    function openCalendarModal() {
+    // Initialize current calendar month/year when calendar is first opened
+    function initializeCalendar() {
       const today = new Date();
       currentCalendarYear = today.getFullYear();
-      currentCalendarMonth = today.getMonth(); // 0-indexed
+      currentCalendarMonth = today.getMonth();
       renderCalendar();
-      openModal(calendarModal);
-    }
-
-    function closeCalendarModal() {
-      closeModal(calendarModal);
     }
 
     // Render calendar grid for currentCalendarYear/currentCalendarMonth
@@ -855,7 +1114,6 @@
       const btnCal = document.getElementById('openCalendar');
       if (btnCal) btnCal.addEventListener('click', openCalendarModal);
     }
-    document.getElementById('closeCalendar').addEventListener('click', closeCalendarModal);
     document.getElementById('prevMonth').addEventListener('click', (e) => { e.stopPropagation(); prevMonth(); });
     document.getElementById('nextMonth').addEventListener('click', (e) => { e.stopPropagation(); nextMonth(); });
 
@@ -868,6 +1126,8 @@
       salaryAmountEl.textContent = `${salary.toFixed(2)} €`;
       savingsAmountEl.textContent = `${savings.toFixed(2)} €`;
       spentAmountEl.textContent = `${totalSpent.toFixed(2)} €`;
+      // Color code for spent amount in summary to red
+      spentAmountEl.style.color = '#ef4444';
       availableAmountEl.textContent = `${available.toFixed(2)} €`;
       // Color code for available amount
       if (available > 0) {
@@ -937,7 +1197,8 @@
         let color = cat.color || '#22c55e';
         // If base color is pure white, adjust to light gray for visibility on dark background
         if (color.toLowerCase() === '#ffffff' || color.toLowerCase() === 'white') {
-          color = '#f1f5f9';
+          // Use a very light gray for white-based categories to ensure contrast on dark background
+          color = '#e5e7eb';
         }
         if (percentage >= 1) {
           color = '#ef4444'; // red when over limit
@@ -1003,38 +1264,20 @@
         amountEl.textContent = `-${tx.amount.toFixed(2)} €`;
         li.appendChild(amountEl);
         // Add edit/delete buttons
-        const actions = document.createElement('div');
-        actions.className = 'trans-actions';
-        const editBtn = document.createElement('button');
-        editBtn.textContent = 'Editar';
-        editBtn.className = 'transaction-action';
-        editBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
+        // Make entire transaction clickable to edit; remove separate edit/delete buttons
+        li.addEventListener('click', () => {
           openExpenseModal(null, tx);
         });
-        const delBtn = document.createElement('button');
-        delBtn.textContent = 'Eliminar';
-        delBtn.className = 'transaction-action';
-        delBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          deleteTransaction(tx.id);
-        });
-        actions.appendChild(editBtn);
-        actions.appendChild(delBtn);
-        li.appendChild(actions);
         transactionsListEl.appendChild(li);
       });
     }
 
-    // Render charts (pie and bar) using canvas
+    // Render charts: draw only a pie chart with a legend showing absolute values and percentages
     function renderCharts() {
       const pieCanvas = document.getElementById('pieChart');
-      const barCanvas = document.getElementById('barChart');
-      if (!pieCanvas || !barCanvas) return;
+      if (!pieCanvas) return;
       const pieCtx = pieCanvas.getContext('2d');
-      const barCtx = barCanvas.getContext('2d');
-      // Calculate totals per category
-      // Build totals including category color so pie slices match the category bars
+      // Compute total spent per category with associated colors
       const totals = state.categories.map(cat => {
         const spent = state.transactions
           .filter(tx => tx.categoryId === cat.id)
@@ -1042,19 +1285,17 @@
         return { name: cat.name, spent, color: cat.color || '#22c55e' };
       }).filter(item => item.spent > 0);
       const totalSpent = totals.reduce((sum, item) => sum + item.spent, 0);
-      // Clear previous drawings
+      // Clear previous drawing
       pieCtx.clearRect(0, 0, pieCanvas.width, pieCanvas.height);
-      barCtx.clearRect(0, 0, barCanvas.width, barCanvas.height);
-      // Colors for slices come from categories; lighten white if necessary for readability
+      // Determine slice colors, adjusting white to a visible shade
       const colors = totals.map(item => {
         let c = item.color || '#22c55e';
-        // If color is pure white, use a slightly darker shade so slice is visible
         if (c.toLowerCase() === '#ffffff' || c.toLowerCase() === 'white') {
           return '#f1f5f9';
         }
         return c;
       });
-      // Draw pie chart
+      // Draw pie segments
       const cx = pieCanvas.width / 2;
       const cy = pieCanvas.height / 2;
       const radius = Math.min(cx, cy) * 0.8;
@@ -1069,7 +1310,7 @@
         pieCtx.fill();
         startAngle += angle;
       });
-      // Draw legend
+      // Populate legend with category names, absolute amounts and percentages
       const legend = document.getElementById('pieLegend');
       if (legend) {
         legend.innerHTML = '';
@@ -1087,101 +1328,174 @@
           row.appendChild(colorBox);
           const text = document.createElement('span');
           const pct = totalSpent > 0 ? ((item.spent / totalSpent) * 100).toFixed(1) : '0.0';
-          // Show absolute spent and percentage
           text.textContent = `${item.name}: ${item.spent.toFixed(2)} € (${pct}% )`;
           row.appendChild(text);
           legend.appendChild(row);
         });
       }
-      // Draw bar chart for last 6 months
-      // Aggregate monthly totals
-      const monthTotals = {};
-      state.transactions.forEach(tx => {
-        const [day, month, year] = tx.date.split('/');
-        const key = `${year}-${month}`;
-        if (!monthTotals[key]) monthTotals[key] = 0;
-        monthTotals[key] += tx.amount;
-      });
-      const keys = Object.keys(monthTotals).sort();
-      const lastKeys = keys.slice(-6);
-      const maxVal = lastKeys.reduce((max, k) => Math.max(max, monthTotals[k]), 0) || 1;
-      const barWidth = barCanvas.width / lastKeys.length * 0.6;
-      const barSpacing = barCanvas.width / lastKeys.length;
-      const chartHeight = barCanvas.height * 0.6;
-      lastKeys.forEach((key, index) => {
-        const value = monthTotals[key];
-        const barHeight = (value / maxVal) * chartHeight;
-        const x = barSpacing * index + (barSpacing - barWidth) / 2;
-        const y = barCanvas.height - barHeight - 20;
-        barCtx.fillStyle = '#22c55e';
-        barCtx.fillRect(x, y, barWidth, barHeight);
-        barCtx.fillStyle = '#cbd5e1';
-        barCtx.font = '10px sans-serif';
-        barCtx.textAlign = 'center';
-        const [yearStr, monthStr] = key.split('-');
-        const monthIndex = parseInt(monthStr, 10) - 1;
-        const monthNamesShort = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-        const label = monthNamesShort[monthIndex];
-        barCtx.fillText(label, x + barWidth / 2, barCanvas.height - 5);
-        barCtx.fillText(`${value.toFixed(0)}€`, x + barWidth / 2, y - 5);
-      });
     }
 
     // Render savings section showing total accumulated savings and monthly breakdown
     function renderGoal() {
       if (!monthlySavingsListEl || !totalSavingsCardEl) return;
-      const monthlySaving = state.config.savings || 0;
       const monthNames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-      const today = new Date();
-      const currentMonthIndex = today.getMonth(); // 0-based
       // Clear previous contents
       monthlySavingsListEl.innerHTML = '';
       totalSavingsCardEl.innerHTML = '';
+      const goalsListEl = document.getElementById('goalsList');
+      if (goalsListEl) goalsListEl.innerHTML = '';
       // If there is no monthly saving configured, show message and stop
-      if (!monthlySaving || monthlySaving <= 0) {
-        totalSavingsCardEl.textContent = 'No has registrado un ahorro mensual';
-        monthlySavingsListEl.textContent = '';
-        return;
+      // If no historical savings recorded, inform user
+      if (state.monthlySavings.length === 0) {
+        totalSavingsCardEl.textContent = 'Todavía no hay ahorros registrados. Se calcularán al finalizar cada mes.';
       }
-      // Build monthly boxes and accumulate total
-      let totalAccum = 0;
-      monthlySavingsListEl.innerHTML = '';
-      for (let m = 0; m <= currentMonthIndex; m++) {
-        totalAccum += monthlySaving;
+      // Compute total accumulated savings from history including initial savings
+      const initial = state.config.initialSavings || 0;
+      const totalHist = state.monthlySavings.reduce((sum, m) => sum + (m.amount || 0), 0);
+      const totalAccum = initial + totalHist;
+      // Display total saved in a large card with details
+      if (initial > 0 || totalHist > 0) {
+        const totalDiv = document.createElement('div');
+        totalDiv.textContent = `Total ahorrado: ${totalAccum.toFixed(2)} €`;
+        // Increase vertical space between lines for readability
+        totalDiv.style.marginBottom = '0.5rem';
+        totalSavingsCardEl.appendChild(totalDiv);
+        if (initial > 0) {
+          const initDiv = document.createElement('div');
+          initDiv.style.fontSize = '0.8rem';
+          initDiv.style.color = '#94a3b8';
+          initDiv.textContent = `Ahorro inicial: ${initial.toFixed(2)} €`;
+          initDiv.style.marginBottom = '0.5rem';
+          totalSavingsCardEl.appendChild(initDiv);
+        }
+      }
+      // Display monthly savings as calendar-like boxes
+      state.monthlySavings.forEach(ms => {
+        const [year, month] = ms.month.split('-');
+        const monthIndex = parseInt(month, 10) - 1;
+        const monthAbbr = monthNames[monthIndex];
         const box = document.createElement('div');
         box.className = 'month-savings-box';
-        box.textContent = `${monthNames[m]}: ${monthlySaving.toFixed(2)} €`;
+        box.textContent = `${monthAbbr} ${year.slice(2)}: ${ms.amount.toFixed(2)} €`;
         monthlySavingsListEl.appendChild(box);
+      });
+      // Compute remaining savings available to allocate (total accumulated minus assigned)
+      let totalAssigned = 0;
+      state.goals.forEach(g => {
+        totalAssigned += parseFloat(g.assigned || 0);
+      });
+      const remaining = totalAccum - totalAssigned;
+      // Display remaining available under total card if there is any saving
+      if (totalAccum > 0) {
+        const remainingEl = document.createElement('div');
+        remainingEl.style.marginTop = '0.3rem';
+        remainingEl.style.fontSize = '0.9rem';
+        remainingEl.style.color = remaining < 0 ? '#ef4444' : '#94a3b8';
+        remainingEl.textContent = `Restante sin asignar: ${remaining.toFixed(2)} €`;
+        totalSavingsCardEl.appendChild(remainingEl);
       }
-      // Create goal summary card with progress bar
-      const goalName = state.config.goalName || 'Objetivo';
-      const goalAmount = state.config.goalAmount || 0;
-      // Clear total savings card
-      totalSavingsCardEl.innerHTML = '';
-      const summary = document.createElement('div');
-      summary.className = 'goal-summary';
-      const title = document.createElement('div');
-      title.textContent = `${goalName}: ${totalAccum.toFixed(2)} €`; // show saved so far
-      title.style.fontSize = '1.2rem';
-      title.style.marginBottom = '0.4rem';
-      summary.appendChild(title);
-      if (goalAmount > 0) {
-        const progressPct = Math.min(totalAccum / goalAmount, 1);
-        const progInfo = document.createElement('div');
-        progInfo.style.fontSize = '0.8rem';
-        progInfo.style.marginBottom = '0.3rem';
-        progInfo.textContent = `Objetivo: ${goalAmount.toFixed(2)} € · Progreso: ${(progressPct * 100).toFixed(1)}%`;
-        summary.appendChild(progInfo);
-        // Progress bar container
-        const progContainer = document.createElement('div');
-        progContainer.className = 'goal-progress-container';
-        const progBar = document.createElement('div');
-        progBar.className = 'goal-progress-bar';
-        progBar.style.width = `${progressPct * 100}%`;
-        progContainer.appendChild(progBar);
-        summary.appendChild(progContainer);
+      // Render goals with progress and quick assign buttons
+      if (goalsListEl) {
+        state.goals.forEach(goal => {
+          const item = document.createElement('div');
+          item.className = 'goal-item';
+          // Header with name and delete button
+          const header = document.createElement('div');
+          header.className = 'goal-header';
+          const nameEl = document.createElement('span');
+          nameEl.textContent = goal.name;
+          nameEl.style.fontWeight = 'bold';
+          header.appendChild(nameEl);
+          // Edit button
+          const editBtn = document.createElement('button');
+          editBtn.textContent = 'Editar';
+          editBtn.className = 'transaction-action';
+          editBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openEditGoalItem(goal);
+          });
+          header.appendChild(editBtn);
+          // Delete button
+          const delBtn = document.createElement('button');
+          delBtn.textContent = 'Eliminar';
+          delBtn.className = 'transaction-action';
+          delBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (confirm('¿Eliminar este objetivo?')) {
+              state.goals = state.goals.filter(g => g.id !== goal.id);
+              saveState(state);
+              renderGoal();
+            }
+          });
+          header.appendChild(delBtn);
+          item.appendChild(header);
+          // Info about assigned vs target
+          const info = document.createElement('div');
+          info.style.fontSize = '0.8rem';
+          info.style.marginTop = '0.3rem';
+          const assignedVal = parseFloat(goal.assigned || 0);
+          const targetVal = parseFloat(goal.amount || 0);
+          info.textContent = `Asignado: ${assignedVal.toFixed(2)} € / Objetivo: ${targetVal.toFixed(2)} €`;
+          item.appendChild(info);
+          // Progress bar and percentage indicator
+          const progContainer = document.createElement('div');
+          progContainer.className = 'goal-progress-container';
+          const progBar = document.createElement('div');
+          progBar.className = 'goal-progress-bar';
+          const pct = targetVal > 0 ? Math.min(assignedVal / targetVal, 1) : 0;
+          progBar.style.width = `${pct * 100}%`;
+          progContainer.appendChild(progBar);
+          const pctLabel = document.createElement('span');
+          pctLabel.textContent = `${(pct * 100).toFixed(0)}%`;
+          pctLabel.style.marginLeft = '0.5rem';
+          pctLabel.style.fontSize = '0.8rem';
+          pctLabel.style.color = '#94a3b8';
+          const progWrapper = document.createElement('div');
+          progWrapper.style.display = 'flex';
+          progWrapper.style.alignItems = 'center';
+          progWrapper.appendChild(progContainer);
+          progWrapper.appendChild(pctLabel);
+          item.appendChild(progWrapper);
+          // Quick assign buttons (+ and -) in a single row
+          const assignRow = document.createElement('div');
+          assignRow.style.display = 'flex';
+          assignRow.style.flexWrap = 'wrap';
+          assignRow.style.gap = '0.4rem';
+          assignRow.style.marginTop = '0.4rem';
+          const increments = [50, 100, 200, 500, 1000];
+          increments.forEach(val => {
+            // Plus button
+            const plusBtn = document.createElement('button');
+            plusBtn.textContent = `+${val}`;
+            plusBtn.className = 'quick-amount';
+            plusBtn.style.fontSize = '0.65rem';
+            plusBtn.style.padding = '0.3rem 0.4rem';
+            plusBtn.addEventListener('click', () => {
+              const currentAssigned = parseFloat(goal.assigned || 0);
+              let newVal = currentAssigned + val;
+              const targetVal = parseFloat(goal.amount || 0);
+              if (newVal > targetVal) newVal = targetVal;
+              updateGoalAssigned(goal.id, newVal);
+            });
+            assignRow.appendChild(plusBtn);
+            // Minus button
+            const minusBtn = document.createElement('button');
+            minusBtn.textContent = `-${val}`;
+            minusBtn.className = 'quick-amount';
+            minusBtn.style.fontSize = '0.65rem';
+            minusBtn.style.padding = '0.3rem 0.4rem';
+            minusBtn.addEventListener('click', () => {
+              const currentAssigned = parseFloat(goal.assigned || 0);
+              let newVal = currentAssigned - val;
+              if (newVal < 0) newVal = 0;
+              updateGoalAssigned(goal.id, newVal);
+            });
+            assignRow.appendChild(minusBtn);
+          });
+          item.appendChild(assignRow);
+          goalsListEl.appendChild(item);
+        });
       }
-      totalSavingsCardEl.appendChild(summary);
     }
 
     // Main render function
@@ -1193,6 +1507,9 @@
 
     // Initial render
     render();
+
+    // Ensure we start on the home page and hide charts/goals sections
+    switchPage('home');
 
     // Expose modal functions globally for inline handlers
     window.openExpenseModal = openExpenseModal;
